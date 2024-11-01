@@ -2,54 +2,35 @@ export OMP_NUM_THREADS=8
 export NCCL_IB_DISABLE=0
 export NCCL_IB_GID_INDEX=3
 # export NCCL_IB_HCA=${ARNOLD_RDMA_DEVICE}
-# export NCCL_SOCKET_IFNAME=eth0
+export NCCL_SOCKET_IFNAME=eth0
 export NCCL_DEBUG=INFO
 
-VISION_MODEL_VERSION="../../../../media/duyifan/model/siglip-so400m-patch14-384"
+VISION_MODEL_VERSION="google/siglip-so400m-patch14-384"
 VISION_MODEL_VERSION_CLEAN="${VISION_MODEL_VERSION//\//_}"
 
 # DPO Stage
 PROMPT_VERSION="qwen_1_5"
-SFT_MODEL="../../../../media/duyifan/model/llava-onevision-qwen2-7b-ov"
+SFT_MODEL="lmms-lab/llava-onevision-qwen2-7b-ov"
 EPOCH=1
 beta=0.1
 
-DPO_MAIN_DIR="../../../../media/duyifan/data/VideoDPO/"
-DPO_RUN_NAME="llava-onevision-qwen2-7b-ov_dpo-beta${beta}-epoch${EPOCH}-multi_node"
+DPO_RUN_NAME="llava-onevision-qwen2-7b-ov_dpo-beta${beta}-epoch${EPOCH}"
 DPO_CLEAN_NAME="${DPO_RUN_NAME##*/}"
-# OUTPUT_DIR="<your-output-folder>/${DPO_CLEAN_NAME}"
+OUTPUT_DIR="<your-output-folder>/${DPO_CLEAN_NAME}"
+DATA_PATH="<your-data-path>"
 
-OUTPUT_DIR="${DPO_MAIN_DIR}/dpo_output/${DPO_CLEAN_NAME}"
-# DATA_PATH="<your-data-path>"
-DATA_PATH="${DPO_MAIN_DIR}/train_data/dpo/sft_dpo_200.jsonl"
-mkdir -p $OUTPUT_DIR
 echo $DPO_RUN_NAME
 
-# export WANDB_API_KEY=""
-# wandb login $WANDB_API_KEY
-
-export WANDB_NAME=$DPO_RUN_NAME--$SFT_MODEL
-
-export WANDB_PROJECT=LLaVA_NeXT
-
-export WANDB_MODE=online
-
-wandb online
-
-# ACCELERATE_CPU_AFFINITY=1 torchrun --nproc_per_node="${NUM_GPUS}" --nnodes="${NNODES}" --node_rank="${RANK}" --master_addr="${ADDR}" --master_port="${PORT}" \
-deepspeed --include localhost:1,2,3,4,5,6\
-    --module \
-    llava.train.train_dpo \
+ACCELERATE_CPU_AFFINITY=1 torchrun --nproc_per_node="${NUM_GPUS}" --nnodes="${NNODES}" --node_rank="${RANK}" --master_addr="${ADDR}" --master_port="${PORT}" \
+    llava/train/train_dpo.py \
     --deepspeed scripts/zero3.json \
-    --lora_enable True \
     --model_name_or_path=${SFT_MODEL} \
     --dpo_alpha=1.0 \
     --beta=${beta} \
     --gamma=0 \
     --version $PROMPT_VERSION \
     --data_path=$DATA_PATH \
-    --image_folder "../../../../media/duyifan/data/VideoDPO/train_video" \
-    --video_folder "../../../../media/duyifan/data/VideoDPO/train_video" \
+    --image_folder "<your-image-folder>" \
     --mm_tunable_parts="mm_vision_tower,mm_mlp_adapter,mm_language_model" \
     --unfreeze_mm_vision_tower True \
     --vision_tower ${VISION_MODEL_VERSION} \
@@ -65,6 +46,8 @@ deepspeed --include localhost:1,2,3,4,5,6\
     --run_name $DPO_CLEAN_NAME \
     --output_dir $OUTPUT_DIR \
     --num_train_epochs $EPOCH \
+    --per_device_train_batch_size 1 \
+    --per_device_eval_batch_size 1 \
     --gradient_accumulation_steps 8 \
     --evaluation_strategy "no" \
     --save_strategy "steps" \
@@ -81,5 +64,6 @@ deepspeed --include localhost:1,2,3,4,5,6\
     --dataloader_num_workers 4 \
     --lazy_preprocess True \
     --report_to wandb \
-    --dataloader_drop_last True \
-    2>&1 | tee $OUTPUT_DIR/train.log
+    --dataloader_drop_last True
+
+

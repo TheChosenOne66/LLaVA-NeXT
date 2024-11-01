@@ -38,7 +38,7 @@ import tokenizers
 from llava.constants import IGNORE_INDEX, DEFAULT_IMAGE_TOKEN, DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN, IMAGE_TOKEN_INDEX
 from torch.utils.data import Dataset
 from llava.train.llava_trainer import LLaVADPOTrainer
-# from data_processing.utils import load_jsonl, load_json
+from data_processing.utils import load_jsonl, load_json
 from llava import conversation as conversation_lib
 from llava.model import *
 from llava.model.language_model.llava_qwen import LlavaQwenConfig
@@ -899,11 +899,9 @@ def preprocess(sources: Sequence[str], tokenizer: transformers.PreTrainedTokeniz
 
 def load_data(data_path):
     if "jsonl" in data_path:
-        # data_list = load_jsonl(data_path)
-        data_list = [json.loads(line) for line in open(data_path).readlines()]
+        data_list = load_jsonl(data_path)
     else:
-        # data_list = load_json(data_path)
-        data_list = json.load(open(data_path))
+        data_list = load_json(data_path)
     return data_list
 
 
@@ -1101,11 +1099,7 @@ class DPODataset(Dataset):
             video_file = os.path.join(video_folder, video_file)
             suffix = video_file.split(".")[-1]
             if not os.path.exists(video_file):
-                video_file = "../../../../media/duyifan/data/VideoDPO/train_video/aKGtVgRQxrc"
-                # print("File {} not exist!".format(video_file))
-
-            print("现在是调试阶段！")
-            print("video_file",video_file)
+                print("File {} not exist!".format(video_file))
 
             if suffix == "pkl":
                 video_info = pickle.load(open(video_file, "rb"))
@@ -1115,8 +1109,7 @@ class DPODataset(Dataset):
                 input_prompt = input_prompt.replace(DEFAULT_IMAGE_TOKEN, DEFAULT_IMAGE_TOKEN * self.data_args.video_token)
                 sources, query_prompt = preprocess_multimodal_movie(copy.deepcopy([e["conversations"] for e in sources]), self.data_args, input_prompt)
             else:  # using videoreader
-                # if "shareVideoGPTV" not in video_file and "liangke" not in video_file:
-                if "train_video" not in video_file and "liangke" not in video_file:
+                if "shareVideoGPTV" not in video_file and "liangke" not in video_file:
                     vr = VideoReader(video_file, ctx=cpu(0))
                     total_frame_num = len(vr)
                     avg_fps = round(vr.get_avg_fps() / self.data_args.video_fps)
@@ -1134,7 +1127,7 @@ class DPODataset(Dataset):
                     frame_files.sort()  # Ensure the frames are sorted if they are named sequentially
 
                     # TODO: Hard CODE: Determine the indices for uniformly sampling 10 frames
-                    num_frames_to_sample = 10 if self.data_args.frames_upbound == 0 else self.data_args.frames_upbound
+                    num_frames_to_sample = 10
 
                     total_frames = len(frame_files)
 
@@ -1315,8 +1308,6 @@ class DPODataCollator(DPODataCollatorWithPadding):
 def make_dpo_data_module(tokenizer: transformers.PreTrainedTokenizer, data_args) -> Dict:
     """Make dataset and collator for supervised fine-tuning."""
     train_dataset = DPODataset(tokenizer=tokenizer, data_path=data_args.data_path, data_args=data_args)
-    print("DPO数据准备完毕！")
-    print("数据集大小为：",train_dataset.__len__())
     return train_dataset
 
 
